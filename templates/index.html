@@ -2,48 +2,73 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>Generator Profili Użytkowników</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Fałszywych Użytkowników</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Wygenerowani użytkownicy</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Imię i Nazwisko</th>
-                <th>Płeć</th>
-                <th>Adres</th>
-                <th>Współrzędne</th>
-                <th>Wzrost (cm)</th>
-                <th>Waga (kg)</th>
-                <th>Oczy</th>
-                <th>Telefon</th>
-                <th>Email</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>{{ user[0] }}</td>
-                <td>{{ user[1] }}</td>
-                <td>{{ user[2] }}</td>
-                <td>{{ user[3] }}</td>
-                <td>{{ user[4] }}, {{ user[5] }}</td>
-                <td>{{ user[6] }}</td>
-                <td>{{ user[7] }}</td>
-                <td>{{ user[8] }}</td>
-                <td>{{ user[9] }}</td>
-                <td>{{ user[10] }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<body class="bg-light">
+    <div class="container py-5">
+        
+        <h1 class="mb-4">Wygenerowani użytkownicy</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="server">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="/generate" method="POST" class="mb-4">
+            <button type="submit" class="btn btn-primary btn-lg">🚀 Wygeneruj nowych użytkowników</button>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered bg-white shadow-sm">
+                <thead class="table-primary">
+                    <tr>
+                        <th>ID</th>
+                        <th>Imię i Nazwisko</th>
+                        <th>Płeć</th>
+                        <th>Adres</th>
+                        <th>Współrzędne</th>
+                        <th>Wzrost (cm)</th>
+                        <th>Waga (kg)</th>
+                        <th>Oczy</th>
+                        <th>Telefon</th>
+                        <th>Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if users %}
+                        {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.name }}</td>
+                                <td>{{ user.gender }}</td>
+                                <td>{{ user.address }}</td>
+                                <td>{{ user.coordinates }}</td>
+                                <td>{{ user.height }}</td>
+                                <td>{{ user.weight }}</td>
+                                <td>{{ user.eyes }}</td>
+                                <td>{{ user.phone }}</td>
+                                <td>{{ user.email }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">Brak użytkowników w bazie. Kliknij przycisk powyżej, aby ich wygenerować!</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
