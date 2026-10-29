@@ -1,6 +1,7 @@
 import os
 import math
 import random
+import hashlib
 from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
 
@@ -53,22 +54,23 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM names;")
     count = cursor.fetchone()[0]
     if count == 0:
-        sample_names = [
-            ('en_US', 'first', 'James'), ('en_US', 'first', 'Mary'), ('en_US', 'first', 'John'), ('en_US', 'first', 'Patricia'),
-            ('en_US', 'first', 'Robert'), ('en_US', 'first', 'Jennifer'), ('en_US', 'first', 'Michael'), ('en_US', 'first', 'Linda'),
-            ('en_US', 'first', 'William'), ('en_US', 'first', 'Elizabeth'), ('en_US', 'first', 'David'), ('en_US', 'first', 'Barbara'),
-            ('en_US', 'last', 'Smith'), ('en_US', 'last', 'Johnson'), ('en_US', 'last', 'Williams'), ('en_US', 'last', 'Brown'),
-            ('en_US', 'last', 'Jones'), ('en_US', 'last', 'Miller'), ('en_US', 'last', 'Davis'), ('en_US', 'last', 'Garcia'),
-            ('en_US', 'last', 'Rodriguez'), ('en_US', 'last', 'Wilson'), ('en_US', 'last', 'Anderson'), ('en_US', 'last', 'Taylor'),
+        en_firsts = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen", "Christopher", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Margaret", "Mark", "Sandra", "Donald", "Ashley", "Steven", "Kimberly", "Paul", "Emily", "Andrew", "Donna", "Joshua", "Michelle"]
+        en_lasts = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker"]
+        
+        de_firsts = ["Hans", "Anna", "Stefan", "Maria", "Michael", "Sabine", "Thomas", "Karin", "Andreas", "Monika", "Wolfgang", "Ursula", "Klaus", "Erika", "Dieter", "Helga", "Jürgen", "Renate", "Peter", "Monika", "Bernd", "Gisela", "Manfred", "Ingrid", "Heinz", "Brigitte", "Günter", "Christa", "Werner", "Hannelore"]
+        de_lasts = ["Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann", "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schwarz", "Zimmermann", "Braun", "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Schmitz", "Krause", "Meier", "Lehmann"]
+
+        name_inserts = []
+        for f in en_firsts:
+            name_inserts.append(('en_US', 'first', f))
+        for l in en_lasts:
+            name_inserts.append(('en_US', 'last', l))
+        for f in de_firsts:
+            name_inserts.append(('de_DE', 'first', f))
+        for l in de_lasts:
+            name_inserts.append(('de_DE', 'last', l))
             
-            ('de_DE', 'first', 'Hans'), ('de_DE', 'first', 'Anna'), ('de_DE', 'first', 'Stefan'), ('de_DE', 'first', 'Maria'),
-            ('de_DE', 'first', 'Michael'), ('de_DE', 'first', 'Sabine'), ('de_DE', 'first', 'Thomas'), ('de_DE', 'first', 'Karin'),
-            ('de_DE', 'first', 'Andreas'), ('de_DE', 'first', 'Monika'), ('de_DE', 'first', 'Wolfgang'), ('de_DE', 'first', 'Ursula'),
-            ('de_DE', 'last', 'Schmidt'), ('de_DE', 'last', 'Schneider'), ('de_DE', 'last', 'Fischer'), ('de_DE', 'last', 'Weber'),
-            ('de_DE', 'last', 'Meyer'), ('de_DE', 'last', 'Wagner'), ('de_DE', 'last', 'Becker'), ('de_DE', 'last', 'Schulz'),
-            ('de_DE', 'last', 'Hoffmann'), ('de_DE', 'last', 'Schäfer'), ('de_DE', 'last', 'Koch'), ('de_DE', 'last', 'Bauer')
-        ]
-        cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", sample_names)
+        cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", name_inserts)
         conn.commit()
         
     cursor.close()
@@ -146,9 +148,10 @@ def generate_email(rng, name):
     number = rng.randint(10, 999)
     return f"{clean_name}{number}@{domain}"
 
-def generate_user_record(locale, seed, batch_index, user_index, first_names, last_names):
-    combined_seed = hash((locale, seed, batch_index, user_index)) & 0xFFFFFFFF
-    rng = random.Random(combined_seed)
+def generate_user_record(locale, seed, global_absolute_index, first_names, last_names):
+    seed_str = f"{locale}_{seed}_{global_absolute_index}"
+    hash_val = int(hashlib.md5(seed_str.encode('utf-8')).hexdigest(), 16) & 0xFFFFFFFF
+    rng = random.Random(hash_val)
     
     name = generate_formatted_name(rng, first_names, last_names)
     height, weight, eyes, gender = generate_physical_attributes(rng)
@@ -189,7 +192,8 @@ def generate_users():
         cursor = conn.cursor()
 
         for i in range(count):
-            user_data = generate_user_record(locale, seed, batch_index, i, first_names, last_names)
+            global_absolute_index = (batch_index - 1) * count + i
+            user_data = generate_user_record(locale, seed, global_absolute_index, first_names, last_names)
             cursor.execute(
                 """INSERT INTO users (name, gender, address, coordinates, height, weight, eyes, phone, email, locale) 
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
@@ -199,7 +203,7 @@ def generate_users():
         conn.commit()
         cursor.close()
         conn.close()
-        flash(f"Successfully generated {count} users for locale {locale}!", "success")
+        flash(f"Successfully generated {count} users for locale {locale} (Seed: {seed}, Batch: {batch_index})!", "success")
     except Exception as e:
         flash(f"Error during user generation: {e}", "danger")
 
