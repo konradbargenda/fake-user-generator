@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Generator Profili Użytkowników</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Wygenerowani użytkownicy</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Imię i Nazwisko</th>
+                <th>Płeć</th>
+                <th>Adres</th>
+                <th>Współrzędne</th>
+                <th>Wzrost (cm)</th>
+                <th>Waga (kg)</th>
+                <th>Oczy</th>
+                <th>Telefon</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user[0] }}</td>
+                <td>{{ user[1] }}</td>
+                <td>{{ user[2] }}</td>
+                <td>{{ user[3] }}</td>
+                <td>{{ user[4] }}, {{ user[5] }}</td>
+                <td>{{ user[6] }}</td>
+                <td>{{ user[7] }}</td>
+                <td>{{ user[8] }}</td>
+                <td>{{ user[9] }}</td>
+                <td>{{ user[10] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
