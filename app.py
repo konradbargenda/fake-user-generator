@@ -18,53 +18,61 @@ def get_db_connection():
     )
 
 def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS names (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            locale VARCHAR(20),
+            category VARCHAR(20),
+            val VARCHAR(100)
+        );
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150),
+            gender VARCHAR(50),
+            address VARCHAR(255),
+            coordinates VARCHAR(100),
+            height INT,
+            weight INT,
+            eyes VARCHAR(50),
+            phone VARCHAR(50),
+            email VARCHAR(100),
+            locale VARCHAR(20)
+        );
+    """)
+    
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS names (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                locale VARCHAR(20),
-                category VARCHAR(20),
-                val VARCHAR(100)
-            );
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(150),
-                gender VARCHAR(50),
-                address VARCHAR(255),
-                coordinates VARCHAR(100),
-                height INT,
-                weight INT,
-                eyes VARCHAR(50),
-                phone VARCHAR(50),
-                email VARCHAR(100),
-                locale VARCHAR(20)
-            );
-        """)
-        cursor.execute("SELECT COUNT(*) FROM names;")
-        count = cursor.fetchone()[0]
-        if count == 0:
-            sample_names = [
-                ('en_US', 'first', 'James'), ('en_US', 'first', 'Mary'), ('en_US', 'first', 'John'), ('en_US', 'first', 'Patricia'),
-                ('en_US', 'first', 'Robert'), ('en_US', 'first', 'Jennifer'), ('en_US', 'first', 'Michael'), ('en_US', 'first', 'Linda'),
-                ('en_US', 'first', 'William'), ('en_US', 'first', 'Elizabeth'), ('en_US', 'last', 'Smith'), ('en_US', 'last', 'Johnson'),
-                ('en_US', 'last', 'Williams'), ('en_US', 'last', 'Brown'), ('en_US', 'last', 'Jones'), ('en_US', 'last', 'Miller'),
-                ('en_US', 'last', 'Davis'), ('en_US', 'last', 'Garcia'), ('en_US', 'last', 'Rodriguez'), ('en_US', 'last', 'Wilson'),
-                ('de_DE', 'first', 'Hans'), ('de_DE', 'first', 'Anna'), ('de_DE', 'first', 'Stefan'), ('de_DE', 'first', 'Maria'),
-                ('de_DE', 'first', 'Michael'), ('de_DE', 'first', 'Sabine'), ('de_DE', 'first', 'Thomas'), ('de_DE', 'first', 'Karin'),
-                ('de_DE', 'first', 'Andreas'), ('de_DE', 'first', 'Monika'), ('de_DE', 'last', 'Schmidt'), ('de_DE', 'last', 'Schneider'),
-                ('de_DE', 'last', 'Fischer'), ('de_DE', 'last', 'Weber'), ('de_DE', 'last', 'Meyer'), ('de_DE', 'last', 'Wagner'),
-                ('de_DE', 'last', 'Becker'), ('de_DE', 'last', 'Schulz'), ('de_DE', 'last', 'Hoffmann'), ('de_DE', 'last', 'Schäfer')
-            ]
-            cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", sample_names)
+        cursor.execute("ALTER TABLE users ADD COLUMN locale VARCHAR(20);")
         conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Init DB error: {e}")
+    except Exception:
+        pass
+
+    cursor.execute("SELECT COUNT(*) FROM names;")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        sample_names = [
+            ('en_US', 'first', 'James'), ('en_US', 'first', 'Mary'), ('en_US', 'first', 'John'), ('en_US', 'first', 'Patricia'),
+            ('en_US', 'first', 'Robert'), ('en_US', 'first', 'Jennifer'), ('en_US', 'first', 'Michael'), ('en_US', 'first', 'Linda'),
+            ('en_US', 'first', 'William'), ('en_US', 'first', 'Elizabeth'), ('en_US', 'first', 'David'), ('en_US', 'first', 'Barbara'),
+            ('en_US', 'last', 'Smith'), ('en_US', 'last', 'Johnson'), ('en_US', 'last', 'Williams'), ('en_US', 'last', 'Brown'),
+            ('en_US', 'last', 'Jones'), ('en_US', 'last', 'Miller'), ('en_US', 'last', 'Davis'), ('en_US', 'last', 'Garcia'),
+            ('en_US', 'last', 'Rodriguez'), ('en_US', 'last', 'Wilson'), ('en_US', 'last', 'Anderson'), ('en_US', 'last', 'Taylor'),
+            
+            ('de_DE', 'first', 'Hans'), ('de_DE', 'first', 'Anna'), ('de_DE', 'first', 'Stefan'), ('de_DE', 'first', 'Maria'),
+            ('de_DE', 'first', 'Michael'), ('de_DE', 'first', 'Sabine'), ('de_DE', 'first', 'Thomas'), ('de_DE', 'first', 'Karin'),
+            ('de_DE', 'first', 'Andreas'), ('de_DE', 'first', 'Monika'), ('de_DE', 'first', 'Wolfgang'), ('de_DE', 'first', 'Ursula'),
+            ('de_DE', 'last', 'Schmidt'), ('de_DE', 'last', 'Schneider'), ('de_DE', 'last', 'Fischer'), ('de_DE', 'last', 'Weber'),
+            ('de_DE', 'last', 'Meyer'), ('de_DE', 'last', 'Wagner'), ('de_DE', 'last', 'Becker'), ('de_DE', 'last', 'Schulz'),
+            ('de_DE', 'last', 'Hoffmann'), ('de_DE', 'last', 'Schäfer'), ('de_DE', 'last', 'Koch'), ('de_DE', 'last', 'Bauer')
+        ]
+        cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", sample_names)
+        conn.commit()
+        
+    cursor.close()
+    conn.close()
 
 def fetch_names_from_db(locale):
     conn = get_db_connection()
