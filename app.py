@@ -19,66 +19,74 @@ def get_db_connection():
     )
 
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS names (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            locale VARCHAR(20),
-            category VARCHAR(20),
-            val VARCHAR(100)
-        );
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(150),
-            gender VARCHAR(50),
-            address VARCHAR(255),
-            coordinates VARCHAR(100),
-            height INT,
-            weight INT,
-            eyes VARCHAR(50),
-            phone VARCHAR(50),
-            email VARCHAR(100),
-            locale VARCHAR(20),
-            seed INT,
-            batch_index INT
-        );
-    """)
-    
-    for col in ['locale', 'seed', 'batch_index']:
-        try:
-            col_type = 'VARCHAR(20)' if col == 'locale' else 'INT'
-            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
-            conn.commit()
-        except Exception:
-            pass
-
-    cursor.execute("SELECT COUNT(*) FROM names;")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        en_firsts = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen", "Christopher", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Margaret", "Mark", "Sandra", "Donald", "Ashley", "Steven", "Kimberly", "Paul", "Emily", "Andrew", "Donna", "Joshua", "Michelle"]
-        en_lasts = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker"]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        de_firsts = ["Hans", "Anna", "Stefan", "Maria", "Michael", "Sabine", "Thomas", "Karin", "Andreas", "Monika", "Wolfgang", "Ursula", "Klaus", "Erika", "Dieter", "Helga", "Jürgen", "Renate", "Peter", "Bernd", "Gisela", "Manfred", "Ingrid", "Heinz", "Brigitte", "Günter", "Christa", "Werner", "Hannelore"]
-        de_lasts = ["Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann", "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schwarz", "Zimmermann", "Braun", "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Schmitz", "Krause", "Meier", "Lehmann"]
+        # Create names table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS names (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                locale VARCHAR(20),
+                category VARCHAR(20),
+                val VARCHAR(100)
+            );
+        """)
+        
+        # Create users table with all required columns upfront
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(150),
+                gender VARCHAR(50),
+                address VARCHAR(255),
+                coordinates VARCHAR(100),
+                height INT,
+                weight INT,
+                eyes VARCHAR(50),
+                phone VARCHAR(50),
+                email VARCHAR(100),
+                locale VARCHAR(20),
+                seed INT,
+                batch_index INT
+            );
+        """)
+        
+        # Safely add columns if an older table version exists
+        for col, col_type in [('locale', 'VARCHAR(20)'), ('seed', 'INT'), ('batch_index', 'INT')]:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
+                conn.commit()
+            except Exception:
+                pass
 
-        name_inserts = []
-        for f in en_firsts:
-            name_inserts.append(('en_US', 'first', f))
-        for l in en_lasts:
-            name_inserts.append(('en_US', 'last', l))
-        for f in de_firsts:
-            name_inserts.append(('de_DE', 'first', f))
-        for l in de_lasts:
-            name_inserts.append(('de_DE', 'last', l))
+        # Seed lookup names if empty
+        cursor.execute("SELECT COUNT(*) FROM names;")
+        count = cursor.fetchone()[0]
+        if count == 0:
+            en_firsts = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen", "Christopher", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Margaret", "Mark", "Sandra", "Donald", "Ashley", "Steven", "Kimberly", "Paul", "Emily", "Andrew", "Donna", "Joshua", "Michelle"]
+            en_lasts = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker"]
             
-        cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", name_inserts)
-        conn.commit()
-        
-    cursor.close()
-    conn.close()
+            de_firsts = ["Hans", "Anna", "Stefan", "Maria", "Michael", "Sabine", "Thomas", "Karin", "Andreas", "Monika", "Wolfgang", "Ursula", "Klaus", "Erika", "Dieter", "Helga", "Jürgen", "Renate", "Peter", "Bernd", "Gisela", "Manfred", "Ingrid", "Heinz", "Brigitte", "Günter", "Christa", "Werner", "Hannelore"]
+            de_lasts = ["Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann", "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schwarz", "Zimmermann", "Braun", "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Schmitz", "Krause", "Meier", "Lehmann"]
+
+            name_inserts = []
+            for f in en_firsts:
+                name_inserts.append(('en_US', 'first', f))
+            for l in en_lasts:
+                name_inserts.append(('en_US', 'last', l))
+            for f in de_firsts:
+                name_inserts.append(('de_DE', 'first', f))
+            for l in de_lasts:
+                name_inserts.append(('de_DE', 'last', l))
+                
+            cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", name_inserts)
+            conn.commit()
+            
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Database Initialization Error: {e}")
 
 def fetch_names_from_db(locale):
     conn = get_db_connection()
@@ -170,12 +178,14 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
+    # Check if users for this specific batch already exist
     cursor.execute(
         "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
         (locale, seed, batch_index)
     )
     users = cursor.fetchall()
     
+    # If not found, automatically generate and save 10 users for this exact batch/seed combo
     if not users:
         first_names, last_names = fetch_names_from_db(locale)
         insert_cursor = conn.cursor()
@@ -190,6 +200,7 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
         conn.commit()
         insert_cursor.close()
         
+        # Fetch the newly generated batch
         cursor.execute(
             "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
             (locale, seed, batch_index)
@@ -213,9 +224,9 @@ def index():
     except ValueError:
         batch_index = 1
         
-    count = int(os.environ.get('GENERATE_COUNT', 10))
-    
+    count = 10
     users = []
+    
     try:
         users = get_or_create_batch(locale, seed, batch_index, count)
     except Exception as e:
