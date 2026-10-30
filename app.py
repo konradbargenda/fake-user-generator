@@ -24,7 +24,6 @@ def init_db():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Ensure tables exist with clear definitions
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS names (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,14 +51,12 @@ def init_db():
             );
         """)
         
-        # Add columns if they don't exist yet
         for col, col_type in [('locale', 'VARCHAR(20)'), ('seed', 'INT'), ('batch_index', 'INT')]:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
             except Exception:
                 pass
 
-        # Check if names are populated
         cursor.execute("SELECT COUNT(*) FROM names;")
         count = cursor.fetchone()[0]
         if count == 0:
@@ -176,15 +173,20 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    # Query exact users for this specific batch, seed, and locale combo
     cursor.execute(
         "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
         (locale, seed, batch_index)
     )
     users = cursor.fetchall()
     
-    # If none exist, generate and save exactly 10 users on-the-fly
-    if not users:
+    if len(users) < count:
+        delete_cursor = conn.cursor()
+        delete_cursor.execute(
+            "DELETE FROM users WHERE locale = %s AND seed = %s AND batch_index = %s;",
+            (locale, seed, batch_index)
+        )
+        delete_cursor.close()
+
         first_names, last_names = fetch_names_from_db(locale)
         insert_cursor = conn.cursor()
         for i in range(count):
@@ -197,7 +199,6 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
             )
         insert_cursor.close()
         
-        # Re-query to return the freshly created batch of 10 users
         cursor.execute(
             "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
             (locale, seed, batch_index)
