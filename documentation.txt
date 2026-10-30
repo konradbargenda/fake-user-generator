@@ -1,0 +1,134 @@
+Here is the complete technical documentation for the custom **Locale-Aware Fake User Generator** system. Although the data generation algorithms are executed via a robust Python engine backed by an Aiven MySQL persistence layer, this architecture functions as a programmatic "Faker" library designed for strict determinism, batch isolation, and localized realism.
+
+---
+
+# Fake User Generator: System & Algorithm Documentation
+
+## 1. Architecture Overview
+
+The application generates synthetic user profiles tailored to specific regional locales (`en_US`, `de_DE`). It guarantees **strict determinism** and **batch isolation**: given the same combination of **Locale**, **Seed**, and **Batch Index**, the system will always generate and display the exact same set of 10 unique users.
+
+### Database Schema Reference
+
+* **`names` Table**: Stores localized lookup pools categorized by `locale` (`en_US`, `de_DE`) and `category` (`first` name, `last` name).
+* **`users` Table**: Stores generated records linked to their metadata (`locale`, `seed`, `batch_index`) to ensure fast on-demand retrieval without regenerating existing batches.
+
+---
+
+## 2. Core Algorithms & Mathematical Models
+
+### A. Deterministic Seeding & Batch Isolation
+
+To prevent Python's process-level hash randomization from breaking reproducibility, the system uses cryptographic hashing (`hashlib.md5`) combined with positional indexing.
+
+* **Algorithm**:
+
+$$\text{SeedString} = \texttt{f"\{locale\}\_\{\text{seed}\}\_\{\text{global\_absolute\_index}\}"}$$
+
+
+$$\text{HashVal} = \text{int}(\text{MD5}(\text{SeedString}), 16) \mathbin{\&} \text{0xFFFFFFFF}$$
+
+
+* **Usage**: The resulting `HashVal` seeds a dedicated instance of Python's Mersenne Twister RNG (`random.Random(HashVal)`).
+* **Batch Index Mapping**: For any given **Batch Index** ($B$) and a batch size ($N = 10$), the global absolute index for user $i$ (where $0 \le i < N$) is calculated as:
+
+$$\text{GlobalIndex} = (B - 1) \times N + i$$
+
+
+
+This ensures that Batch 1 and Batch 2 draw from completely non-overlapping state spaces while remaining fully reproducible when revisiting either batch.
+
+---
+
+### B. Normally Distributed Physical Attributes (Height & Weight)
+
+Physical attributes like height and weight mimic real-world human biometric distributions using Gaussian (normal) distributions constrained by biologically plausible boundaries.
+
+* **Height Model**:
+
+$$\text{Height} \sim \mathcal{N}(\mu=175\text{ cm}, \sigma=10\text{ cm})$$
+
+
+* *Clamping*: Bounded between $140\text{ cm}$ and $210\text{ cm}$ using `max(140, min(210, value))`.
+
+
+* **Weight Model**:
+
+$$\text{Weight} \sim \mathcal{N}(\mu=70\text{ kg}, \sigma=15\text{ kg})$$
+
+
+* *Clamping*: Bounded between $40\text{ kg}$ and $140\text{ kg}$.
+
+
+* **Secondary Attributes**: Eye color is sampled uniformly from categorical weights (`Blue`, `Green`, `Hazel`, `Brown`, `Amber`), and gender is chosen from `Male`, `Female`, `Other`.
+
+---
+
+### C. Geographic Coordinates with Constant Probability Density Function (PDF)
+
+Generating random latitude and longitude points uniformly across a 2D rectangular grid creates visual bunching near the poles due to meridian convergence. To achieve a **uniform distribution across the surface of a sphere (Constant PDF)**, the system samples uniformly over solid angle parameters:
+
+1. Azimuthal angle ($\phi$) sampled uniformly across longitude:
+
+$$\phi \sim \mathcal{U}(0, 2\pi)$$
+
+
+2. Cosine of the polar angle ($\cos\theta$) sampled uniformly to account for surface area scaling by latitude:
+
+$$\cos\theta \sim \mathcal{U}(-1, 1)$$
+
+
+$$\theta = \arccos(\cos\theta)$$
+
+
+3. Conversion to geographic coordinates:
+
+$$\text{Latitude} = \theta \cdot \left(\frac{180}{\pi}\right) - 90$$
+
+
+$$\text{Longitude} = \phi \cdot \left(\frac{180}{\pi}\right) - 180$$
+
+
+
+---
+
+### D. Localized Name & Address Customization
+
+Name and address generation adapts dynamically depending on the selected locale.
+
+* **Name Composition**:
+* Fetches pooled `first` and `last` names from the database corresponding to the active locale (`en_US` or `de_DE`).
+* Stochastically injects optional elements using boolean RNG flags: an optional title (`Mr.`, `Ms.`, `Dr.`, `Prof.`) and/or a middle name.
+
+
+* **Address & Contact Formatting (`en_US` vs `de_DE`)**:
+* *German (`de_DE`)*: Formats streets using local naming conventions (e.g., *Hauptstraße*, *Gartenstraße*), 5-digit postal codes, German cities (*Berlin*, *Munich*, *Hamburg*), and international phone formatting (`+49 ...`).
+* *English (`en_US`)*: Formats streets (e.g., *Main St*, *Oak Rd*), US-style postal codes, major US cities, and standard North American phone formatting (`+1 (...) ...-...`).
+* **Email Generation**: Derives a clean, normalized local-part from the generated name combined with a random 2-digit/3-digit suffix and a mock domain (`example.com`, `fakeuser.io`).
+
+
+
+---
+
+## 3. API & Web Interface Reference
+
+The application exposes a web UI and handling routes designed around batch navigation:
+
+| Endpoint | Method | Arguments (Query / Form) | Description |
+| --- | --- | --- | --- |
+| `/` | `GET` | `locale` (string), `seed` (int), `batch_index` (int) | **Batch View Router**: Checks the database for the requested batch. If fewer than 10 users exist for this exact combination, it automatically generates, persists, and displays the exact 10-user batch.
+
+ |
+| `/generate` | `POST` | `locale`, `seed`, `batch_index` | **Navigation Form Handler**: Accepts input parameters from the dashboard UI and redirects to the corresponding batch view URL. |
+
+### How to Use
+
+1. Open the application dashboard in your browser.
+2. Select your desired **Locale / Region** (`English (en_US)` or `German (de_DE)`).
+3. Enter any integer **Seed** (e.g., `42`, `50`).
+
+
+4. Enter any **Batch Index** (e.g., `1`, `2`, up to infinity).
+
+
+5. Click **🔍 View / Load Batch** to instantly load or generate that specific isolated batch of 10 records. Returning to a previous batch later will reproduce the exact same records from the Aiven MySQL backend.
