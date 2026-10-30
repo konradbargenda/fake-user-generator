@@ -15,8 +15,7 @@ def get_db_connection():
         user=os.environ.get('DB_USER', 'avnadmin'),
         password=os.environ.get('DB_PASSWORD'),
         database=os.environ.get('DB_NAME', 'defaultdb'),
-        ssl_verify_cert=False,
-        autocommit=True
+        ssl_verify_cert=False
     )
 
 def init_db():
@@ -50,10 +49,12 @@ def init_db():
                 batch_index INT
             );
         """)
+        conn.commit()
         
         for col, col_type in [('locale', 'VARCHAR(20)'), ('seed', 'INT'), ('batch_index', 'INT')]:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
+                conn.commit()
             except Exception:
                 pass
 
@@ -77,6 +78,7 @@ def init_db():
                 name_inserts.append(('de_DE', 'last', l))
                 
             cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", name_inserts)
+            conn.commit()
             
         cursor.close()
         conn.close()
@@ -173,20 +175,20 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    # Fetch existing users for this batch
     cursor.execute(
         "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
         (locale, seed, batch_index)
     )
     users = cursor.fetchall()
+    cursor.close()
     
-    # If we don't have exactly 10 users, clear incomplete ones and generate the full batch of 10
     if len(users) != count:
         del_cursor = conn.cursor()
         del_cursor.execute(
             "DELETE FROM users WHERE locale = %s AND seed = %s AND batch_index = %s;",
             (locale, seed, batch_index)
         )
+        conn.commit()
         del_cursor.close()
 
         first_names, last_names = fetch_names_from_db(locale)
@@ -199,15 +201,17 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 user_data
             )
+        conn.commit()
         ins_cursor.close()
         
-        cursor.execute(
+        new_cursor = conn.cursor(dictionary=True)
+        new_cursor.execute(
             "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
             (locale, seed, batch_index)
         )
-        users = cursor.fetchall()
+        users = new_cursor.fetchall()
+        new_cursor.close()
         
-    cursor.close()
     conn.close()
     return users
 
@@ -240,7 +244,7 @@ def generate_users():
     except ValueError:
         seed = 42
     try:
-        batch_index = int(request.form.get('batch_index', 1))
+        batch_index = int(request.args.get('batch_index', 1))
     except ValueError:
         batch_index = 1
         
