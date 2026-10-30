@@ -157,7 +157,7 @@ def generate_email(rng, name):
     number = rng.randint(10, 999)
     return f"{clean_name}{number}@{domain}"
 
-def generate_user_record(locale, seed, global_absolute_index, first_names, last_names):
+def generate_user_record(locale, seed, batch_index, global_absolute_index, first_names, last_names):
     seed_str = f"{locale}_{seed}_{global_absolute_index}"
     hash_val = int(hashlib.md5(seed_str.encode('utf-8')).hexdigest(), 16) & 0xFFFFFFFF
     rng = random.Random(hash_val)
@@ -169,7 +169,8 @@ def generate_user_record(locale, seed, global_absolute_index, first_names, last_
     phone = generate_phone_number(rng, locale)
     email = generate_email(rng, name)
     
-    return (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, global_absolute_index)
+    # Store the actual batch_index (not global_absolute_index) in the database column
+    return (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, batch_index)
 
 def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
@@ -195,7 +196,7 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
         ins_cursor = conn.cursor()
         for i in range(count):
             global_absolute_index = (batch_index - 1) * count + i
-            user_data = generate_user_record(locale, seed, global_absolute_index, first_names, last_names)
+            user_data = generate_user_record(locale, seed, batch_index, global_absolute_index, first_names, last_names)
             ins_cursor.execute(
                 """INSERT INTO users (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, batch_index) 
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
@@ -244,7 +245,7 @@ def generate_users():
     except ValueError:
         seed = 42
     try:
-        batch_index = int(request.args.get('batch_index', 1))
+        batch_index = int(request.form.get('batch_index', 1))
     except ValueError:
         batch_index = 1
         
