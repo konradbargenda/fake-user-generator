@@ -166,7 +166,7 @@ def generate_user_record(locale, seed, global_absolute_index, first_names, last_
     
     return (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, global_absolute_index)
 
-def get_or_create_batch(locale, seed, batch_index, count=5):
+def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
@@ -213,7 +213,7 @@ def index():
     except ValueError:
         batch_index = 1
         
-    count = int(os.environ.get('GENERATE_COUNT', 5))
+    count = int(os.environ.get('GENERATE_COUNT', 10))
     
     users = []
     try:
