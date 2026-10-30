@@ -9,7 +9,7 @@
 <body class="bg-light">
     <div class="container py-5">
         
-        <h1 class="mb-4">Generated Users</h1>
+        <h1 class="mb-4">Generated Users (Batch View)</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -22,25 +22,25 @@
             {% endif %}
         {% endwith %}
 
-        <form action="/generate" method="POST" class="mb-4">
+        <form action="/generate" method="POST" class="mb-4 bg-white p-4 rounded shadow-sm">
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
                     <label class="form-label text-muted small">Locale / Region</label>
                     <select name="locale" class="form-select">
-                        <option value="en_US">English (en_US)</option>
-                        <option value="de_DE">German (de_DE)</option>
+                        <option value="en_US" {% if current_locale == 'en_US' %}selected{% endif %}>English (en_US)</option>
+                        <option value="de_DE" {% if current_locale == 'de_DE' %}selected{% endif %}>German (de_DE)</option>
                     </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label text-muted small">Seed</label>
-                    <input type="number" name="seed" class="form-control" value="42">
+                    <input type="number" name="seed" class="form-control" value="{{ current_seed }}">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label text-muted small">Batch Index</label>
-                    <input type="number" name="batch_index" class="form-control" value="1">
+                    <input type="number" name="batch_index" class="form-control" value="{{ current_batch }}">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">🚀 Generate New Users</button>
+            <button type="submit" class="btn btn-primary btn-lg">🔍 View / Load Batch</button>
         </form>
 
         <div class="table-responsive">
@@ -58,6 +58,8 @@
                         <th>Phone</th>
                         <th>Email</th>
                         <th>Locale</th>
+                        <th>Seed</th>
+                        <th>Batch</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -75,11 +77,13 @@
                                 <td>{{ user.phone }}</td>
                                 <td>{{ user.email }}</td>
                                 <td>{{ user.locale }}</td>
+                                <td>{{ user.seed }}</td>
+                                <td>{{ user.batch_index }}</td>
                             </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-4">No users found in the database. Click the button above to generate some!</td>
+                            <td colspan="13" class="text-center text-muted py-4">No users found for this batch.</td>
                         </tr>
                     {% endif %}
                 </tbody>

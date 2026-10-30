@@ -41,15 +41,19 @@ def init_db():
             eyes VARCHAR(50),
             phone VARCHAR(50),
             email VARCHAR(100),
-            locale VARCHAR(20)
+            locale VARCHAR(20),
+            seed INT,
+            batch_index INT
         );
     """)
     
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN locale VARCHAR(20);")
-        conn.commit()
-    except Exception:
-        pass
+    for col in ['locale', 'seed', 'batch_index']:
+        try:
+            col_type = 'VARCHAR(20)' if col == 'locale' else 'INT'
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
+            conn.commit()
+        except Exception:
+            pass
 
     cursor.execute("SELECT COUNT(*) FROM names;")
     count = cursor.fetchone()[0]
@@ -57,7 +61,7 @@ def init_db():
         en_firsts = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen", "Christopher", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Margaret", "Mark", "Sandra", "Donald", "Ashley", "Steven", "Kimberly", "Paul", "Emily", "Andrew", "Donna", "Joshua", "Michelle"]
         en_lasts = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker"]
         
-        de_firsts = ["Hans", "Anna", "Stefan", "Maria", "Michael", "Sabine", "Thomas", "Karin", "Andreas", "Monika", "Wolfgang", "Ursula", "Klaus", "Erika", "Dieter", "Helga", "Jürgen", "Renate", "Peter", "Monika", "Bernd", "Gisela", "Manfred", "Ingrid", "Heinz", "Brigitte", "Günter", "Christa", "Werner", "Hannelore"]
+        de_firsts = ["Hans", "Anna", "Stefan", "Maria", "Michael", "Sabine", "Thomas", "Karin", "Andreas", "Monika", "Wolfgang", "Ursula", "Klaus", "Erika", "Dieter", "Helga", "Jürgen", "Renate", "Peter", "Bernd", "Gisela", "Manfred", "Ingrid", "Heinz", "Brigitte", "Günter", "Christa", "Werner", "Hannelore"]
         de_lasts = ["Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann", "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schwarz", "Zimmermann", "Braun", "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Schmitz", "Krause", "Meier", "Lehmann"]
 
         name_inserts = []
@@ -160,54 +164,78 @@ def generate_user_record(locale, seed, global_absolute_index, first_names, last_
     phone = generate_phone_number(rng, locale)
     email = generate_email(rng, name)
     
-    return (name, gender, address, coordinates, height, weight, eyes, phone, email, locale)
+    return (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, global_absolute_index)
+
+def get_or_create_batch(locale, seed, batch_index, count=5):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute(
+        "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
+        (locale, seed, batch_index)
+    )
+    users = cursor.fetchall()
+    
+    if not users:
+        first_names, last_names = fetch_names_from_db(locale)
+        insert_cursor = conn.cursor()
+        for i in range(count):
+            global_absolute_index = (batch_index - 1) * count + i
+            user_data = generate_user_record(locale, seed, global_absolute_index, first_names, last_names)
+            insert_cursor.execute(
+                """INSERT INTO users (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, batch_index) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                user_data
+            )
+        conn.commit()
+        insert_cursor.close()
+        
+        cursor.execute(
+            "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
+            (locale, seed, batch_index)
+        )
+        users = cursor.fetchall()
+        
+    cursor.close()
+    conn.close()
+    return users
 
 @app.route('/')
 def index():
     init_db()
+    locale = request.args.get('locale', 'en_US')
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users ORDER BY id DESC LIMIT 20;")
-        users = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        seed = int(request.args.get('seed', 42))
+    except ValueError:
+        seed = 42
+    try:
+        batch_index = int(request.args.get('batch_index', 1))
+    except ValueError:
+        batch_index = 1
+        
+    count = int(os.environ.get('GENERATE_COUNT', 5))
+    
+    users = []
+    try:
+        users = get_or_create_batch(locale, seed, batch_index, count)
     except Exception as e:
-        users = []
-        flash(f"Database connection error: {e}", "danger")
-    return render_template('index.html', users=users)
+        flash(f"Database error: {e}", "danger")
+        
+    return render_template('index.html', users=users, current_locale=locale, current_seed=seed, current_batch=batch_index)
 
 @app.route('/generate', methods=['POST'])
 def generate_users():
-    init_db()
+    locale = request.form.get('locale', 'en_US')
     try:
-        count = int(os.environ.get('GENERATE_COUNT', 5))
-        locale = request.form.get('locale', 'en_US')
         seed = int(request.form.get('seed', 42))
+    except ValueError:
+        seed = 42
+    try:
         batch_index = int(request.form.get('batch_index', 1))
-
-        first_names, last_names = fetch_names_from_db(locale)
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        for i in range(count):
-            global_absolute_index = (batch_index - 1) * count + i
-            user_data = generate_user_record(locale, seed, global_absolute_index, first_names, last_names)
-            cursor.execute(
-                """INSERT INTO users (name, gender, address, coordinates, height, weight, eyes, phone, email, locale) 
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                user_data
-            )
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-        flash(f"Successfully generated {count} users for locale {locale} (Seed: {seed}, Batch: {batch_index})!", "success")
-    except Exception as e:
-        flash(f"Error during user generation: {e}", "danger")
-
-    return redirect(url_for('index'))
+    except ValueError:
+        batch_index = 1
+        
+    return redirect(url_for('index', locale=locale, seed=seed, batch_index=batch_index))
 
 if __name__ == '__main__':
     init_db()
