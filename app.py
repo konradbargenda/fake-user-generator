@@ -173,31 +173,33 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
+    # Fetch existing users for this batch
     cursor.execute(
         "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
         (locale, seed, batch_index)
     )
     users = cursor.fetchall()
     
-    if len(users) < count:
-        delete_cursor = conn.cursor()
-        delete_cursor.execute(
+    # If we don't have exactly 10 users, clear incomplete ones and generate the full batch of 10
+    if len(users) != count:
+        del_cursor = conn.cursor()
+        del_cursor.execute(
             "DELETE FROM users WHERE locale = %s AND seed = %s AND batch_index = %s;",
             (locale, seed, batch_index)
         )
-        delete_cursor.close()
+        del_cursor.close()
 
         first_names, last_names = fetch_names_from_db(locale)
-        insert_cursor = conn.cursor()
+        ins_cursor = conn.cursor()
         for i in range(count):
             global_absolute_index = (batch_index - 1) * count + i
             user_data = generate_user_record(locale, seed, global_absolute_index, first_names, last_names)
-            insert_cursor.execute(
+            ins_cursor.execute(
                 """INSERT INTO users (name, gender, address, coordinates, height, weight, eyes, phone, email, locale, seed, batch_index) 
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 user_data
             )
-        insert_cursor.close()
+        ins_cursor.close()
         
         cursor.execute(
             "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
