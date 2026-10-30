@@ -15,7 +15,8 @@ def get_db_connection():
         user=os.environ.get('DB_USER', 'avnadmin'),
         password=os.environ.get('DB_PASSWORD'),
         database=os.environ.get('DB_NAME', 'defaultdb'),
-        ssl_verify_cert=False
+        ssl_verify_cert=False,
+        autocommit=True
     )
 
 def init_db():
@@ -23,7 +24,7 @@ def init_db():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Create names table
+        # Ensure tables exist with clear definitions
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS names (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -33,7 +34,6 @@ def init_db():
             );
         """)
         
-        # Create users table with all required columns upfront
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,15 +52,14 @@ def init_db():
             );
         """)
         
-        # Safely add columns if an older table version exists
+        # Add columns if they don't exist yet
         for col, col_type in [('locale', 'VARCHAR(20)'), ('seed', 'INT'), ('batch_index', 'INT')]:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
-                conn.commit()
             except Exception:
                 pass
 
-        # Seed lookup names if empty
+        # Check if names are populated
         cursor.execute("SELECT COUNT(*) FROM names;")
         count = cursor.fetchone()[0]
         if count == 0:
@@ -81,12 +80,11 @@ def init_db():
                 name_inserts.append(('de_DE', 'last', l))
                 
             cursor.executemany("INSERT INTO names (locale, category, val) VALUES (%s, %s, %s);", name_inserts)
-            conn.commit()
             
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Database Initialization Error: {e}")
+        print(f"Init DB Error: {e}")
 
 def fetch_names_from_db(locale):
     conn = get_db_connection()
@@ -178,14 +176,14 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    # Check if users for this specific batch already exist
+    # Query exact users for this specific batch, seed, and locale combo
     cursor.execute(
         "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
         (locale, seed, batch_index)
     )
     users = cursor.fetchall()
     
-    # If not found, automatically generate and save 10 users for this exact batch/seed combo
+    # If none exist, generate and save exactly 10 users on-the-fly
     if not users:
         first_names, last_names = fetch_names_from_db(locale)
         insert_cursor = conn.cursor()
@@ -197,10 +195,9 @@ def get_or_create_batch(locale, seed, batch_index, count=10):
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 user_data
             )
-        conn.commit()
         insert_cursor.close()
         
-        # Fetch the newly generated batch
+        # Re-query to return the freshly created batch of 10 users
         cursor.execute(
             "SELECT * FROM users WHERE locale = %s AND seed = %s AND batch_index = %s ORDER BY id ASC;",
             (locale, seed, batch_index)
@@ -224,11 +221,9 @@ def index():
     except ValueError:
         batch_index = 1
         
-    count = 10
     users = []
-    
     try:
-        users = get_or_create_batch(locale, seed, batch_index, count)
+        users = get_or_create_batch(locale, seed, batch_index, 10)
     except Exception as e:
         flash(f"Database error: {e}", "danger")
         
